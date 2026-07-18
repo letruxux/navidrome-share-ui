@@ -1,40 +1,46 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useQueryParams from "react-use-query-params";
 import type { ShareInfo } from "../../index";
+import { Centered, Error, Loading } from "./components/umm";
+import { formatSeconds } from "./utils";
+import { Playing } from "./components/playing";
+import { useEverythingStore } from "./everything-store";
 
-const Loader = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={24}
-    height={24}
-    fill="none"
-    stroke="currentColor"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    strokeWidth={2}
-    className="lucide lucide-loader-circle-icon lucide-loader-circle animate-spin"
-    {...props}
-  >
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-  </svg>
-);
+function ShareInfo({
+  shareInfo,
+  selectedTrack,
+}: {
+  selectedTrack: string | null;
+  shareInfo: ShareInfo | null;
+}) {
+  const { audioElement, setSelectedTrackId } = useEverythingStore();
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => {
+    console.log(!!audioElement, "element");
+    if (!audioElement) return;
 
-function Centered({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-center min-h-dvh flex-col">{children}</div>
-  );
-}
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onEnded = () => setPlaying(false);
 
-function formatSeconds(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
-  const secondsLeft = Math.floor(seconds % 60);
-  return `${minutes}:${secondsLeft < 10 ? "0" : ""}${secondsLeft}`;
-}
+    audioElement.addEventListener("play", onPlay);
+    audioElement.addEventListener("pause", onPause);
+    audioElement.addEventListener("ended", onEnded);
 
-function ShareInfo({ shareInfo }: { shareInfo: ShareInfo | null }) {
+    // sync initial state
+    setPlaying(!audioElement.paused);
+
+    return () => {
+      audioElement.removeEventListener("play", onPlay);
+      audioElement.removeEventListener("pause", onPause);
+      audioElement.removeEventListener("ended", onEnded);
+    };
+  }, [audioElement]);
   if (!shareInfo) return null;
   const firstTrack = shareInfo.tracks[0];
   if (!firstTrack) return null;
+  console.log(playing);
+
   return (
     <Centered>
       <img
@@ -48,17 +54,19 @@ function ShareInfo({ shareInfo }: { shareInfo: ShareInfo | null }) {
         {shareInfo.tracks.length > 1 && "s"}
       </h1>
       <hr className="border-mauve-400 max-w-lg w-full my-4" />
-      <div className="flex flex-col gap-4 max-w-lg w-full">
+      <div className="flex flex-col gap-4 max-w-lg w-full mb-32">
         {shareInfo.tracks.map((track) => (
           <div
             key={track.id}
-            className="flex gap-4 max-w-lg w-full hover:bg-[rgba(0,0,0,0.8)] transition-colors p-2 rounded-xl"
+            className="flex gap-4 max-w-lg w-full hover:bg-[rgba(0,0,0,0.8)] transition-colors p-2 rounded-xl cursor-pointer"
+            onClick={() => setSelectedTrackId(track.id)}
           >
             <div className="w-full">
-              <h2 className="text-lg font-bold">{track.title}</h2>
+              <h2 className="text-lg font-bold truncate">{track.title}</h2>
               <h3 className="text-mauve-400">{track.artist}</h3>
             </div>
             <div className="w-full flex items-center justify-end">
+              {selectedTrack === track.id && playing && <Playing className="mr-4" />}
               <div className="text-mauve-400">{formatSeconds(track.duration)}</div>
             </div>
           </div>
@@ -68,28 +76,27 @@ function ShareInfo({ shareInfo }: { shareInfo: ShareInfo | null }) {
   );
 }
 
-function Loading() {
-  return (
-    <Centered>
-      <Loader />
-    </Centered>
-  );
-}
-
-function Error({ error }: { error: Error }) {
-  return (
-    <Centered>
-      <div className="text-red-500">Error: {error.message}</div>
-    </Centered>
-  );
-}
-
 export default function App() {
   const [params] = useQueryParams();
   const url = useMemo(() => params.url.at(0) || null, [params]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [shareInfo, setShareInfo] = useState<ShareInfo | null>(null);
+  const {
+    shareInfo,
+    setShareInfo,
+    selectedTrackId,
+    setAudioElement,
+    setSelectedTrackId,
+  } = useEverythingStore();
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const selectedTrackObj = useMemo(() => {
+    if (!selectedTrackId) return null;
+    return shareInfo?.tracks.find((e) => e.id === selectedTrackId);
+  }, [selectedTrackId, shareInfo]);
+
+  useEffect(() => {
+    if (audioRef.current) setAudioElement(audioRef.current);
+  }, [audioRef.current, setAudioElement]);
 
   useEffect(() => {
     if (!url) return;
@@ -98,6 +105,7 @@ export default function App() {
       .then((r) => r.json())
       .then((r) => {
         setShareInfo(r.shareInfo);
+        setSelectedTrackId(r.shareInfo.tracks[0].id);
         console.log(r);
         setLoading(false);
       })
@@ -119,7 +127,24 @@ export default function App() {
     >
       {loading && <Loading />}
       {error && <Error error={error} />}
-      {!loading && !error && <ShareInfo shareInfo={shareInfo} />}
+      {!loading && !error && (
+        <ShareInfo shareInfo={shareInfo} selectedTrack={selectedTrackId} />
+      )}
+      {selectedTrackObj && shareInfo && (
+        <div className="fixed bottom-4 left-4 w-[calc(100%-32px)]">
+          <audio
+            key={selectedTrackObj.id}
+            controls
+            className="mx-auto max-w-2xl w-full"
+            ref={audioRef}
+          >
+            <source
+              src={`${new URL(shareInfo.shareUrl).origin}/share/s/${selectedTrackObj.id}`}
+              type="audio/mpeg"
+            />
+          </audio>
+        </div>
+      )}
     </div>
   );
 }

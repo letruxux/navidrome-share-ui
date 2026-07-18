@@ -30,13 +30,12 @@ app.get("/extract", async (c) => {
     if (inner.startsWith("window.__SHARE_INFO__")) {
       const foundShareInfo = JSON.parse(
         JSON.parse(inner.replace("window.__SHARE_INFO__ = ", "")),
-      );
+      ) as ShareInfo;
       shareInfo = foundShareInfo;
     }
   });
-  console.log(shareInfo);
-  if (!shareInfo) return status(404, { message: "Share not found" });
-  return status(200, { shareInfo: { ...shareInfo, shareUrl: url } });
+  if (shareInfo === null) return status(404, { message: "Share not found" });
+  return status(200, { shareInfo: { ...(shareInfo as ShareInfo), shareUrl: url } });
 });
 
 Bun.serve({
