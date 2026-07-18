@@ -3,7 +3,7 @@ import * as cheerio from "cheerio";
 
 const app = new Elysia();
 
-interface ShareInfo {
+export interface ShareInfo {
   id: string;
   description: string;
   downloadable: boolean;
@@ -15,12 +15,13 @@ interface ShareInfo {
     updatedAt: string;
     duration: number;
   }[];
+  shareUrl: string;
 }
 
 app.get("/extract", async (c) => {
   const { url } = c.query;
+  console.log(url);
   if (!url) return status(400, { message: "Missing URL" });
-  /* https://navi.srv.ltrx.lol/share/wpZ4izz7b3 */
   const html = await fetch(url).then((r) => r.text());
   const $ = cheerio.load(html);
   let shareInfo: ShareInfo | null = null;
@@ -33,8 +34,9 @@ app.get("/extract", async (c) => {
       shareInfo = foundShareInfo;
     }
   });
+  console.log(shareInfo);
   if (!shareInfo) return status(404, { message: "Share not found" });
-  return status(200, { shareInfo });
+  return status(200, { shareInfo: { ...shareInfo, shareUrl: url } });
 });
 
 Bun.serve({

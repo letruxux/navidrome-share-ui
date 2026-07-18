@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+body {
+  font-family: "Poppins", sans-serif;
+}
+
+body {
+  /* circle gradient from center */
+  background:
+    radial-gradient(circle at 50% 50%, #e0e0e0 0%, #ffffff 50%, #e0e0e0 100%),
+    radial-gradient(circle at 50% 50%, #e0e0e0 0%, #ffffff 50%, #e0e0e0 100%);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
