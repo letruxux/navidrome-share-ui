@@ -1,8 +1,16 @@
 import { Loader } from "./loader";
 
-export function Centered({ children }: { children: React.ReactNode }) {
+export function Centered({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="flex items-center justify-center min-h-dvh flex-col">{children}</div>
+    <div className={"flex items-center justify-center min-h-dvh flex-col " + className}>
+      {children}
+    </div>
   );
 }
 

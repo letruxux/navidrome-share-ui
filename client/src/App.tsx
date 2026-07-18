@@ -1,22 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useQueryParams from "react-use-query-params";
-import type { ShareInfo } from "../../index";
-import { Centered, Error, Loading } from "./components/umm";
+import type { ShareInfo as ShareInfoType } from "../../index";
+import { Centered, Error as ErrorView, Loading } from "./components/umm";
 import { formatSeconds } from "./utils";
 import { Playing } from "./components/playing";
 import { useEverythingStore } from "./everything-store";
 
-function ShareInfo({
+function ShareInfoView({
   shareInfo,
   selectedTrack,
 }: {
   selectedTrack: string | null;
-  shareInfo: ShareInfo | null;
+  shareInfo: ShareInfoType | null;
 }) {
-  const { audioElement, setSelectedTrackId } = useEverythingStore();
+  const { audioElement, selectedTrackId, setSelectedTrackId } = useEverythingStore();
   const [playing, setPlaying] = useState(false);
+
   useEffect(() => {
-    console.log(!!audioElement, "element");
+    if (!selectedTrackId) return;
+    audioElement?.play();
+  }, [selectedTrackId, audioElement]);
+
+  useEffect(() => {
     if (!audioElement) return;
 
     const onPlay = () => setPlaying(true);
@@ -36,16 +41,18 @@ function ShareInfo({
       audioElement.removeEventListener("ended", onEnded);
     };
   }, [audioElement]);
+
   if (!shareInfo) return null;
   const firstTrack = shareInfo.tracks[0];
   if (!firstTrack) return null;
-  console.log(playing);
+
+  const origin = new URL(shareInfo.shareUrl).origin;
 
   return (
-    <Centered>
+    <Centered className="pt-16 pb-32">
       <img
-        className="rounded-full bg-black size-64"
-        src={`${new URL(shareInfo.shareUrl).origin}/share/img/${firstTrack.id}?size=300&square=true`}
+        className="rounded-lg border border-neutral-800 bg-black size-64"
+        src={`${origin}/share/img/${firstTrack.id}?size=300&square=true`}
         alt={firstTrack.album}
       />
       <h1 className="text-xl font-bold mt-4">{firstTrack.album}</h1>
@@ -54,7 +61,7 @@ function ShareInfo({
         {shareInfo.tracks.length > 1 && "s"}
       </h1>
       <hr className="border-mauve-400 max-w-lg w-full my-4" />
-      <div className="flex flex-col gap-4 max-w-lg w-full mb-32">
+      <div className="flex flex-col gap-4 max-w-lg w-full">
         {shareInfo.tracks.map((track) => (
           <div
             key={track.id}
@@ -80,7 +87,7 @@ export default function App() {
   const [params] = useQueryParams();
   const url = useMemo(() => params.url.at(0) || null, [params]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<Error | null>(null);
   const {
     shareInfo,
     setShareInfo,
@@ -88,32 +95,44 @@ export default function App() {
     setAudioElement,
     setSelectedTrackId,
   } = useEverythingStore();
-  const audioRef = useRef<HTMLAudioElement>(null);
+
   const selectedTrackObj = useMemo(() => {
     if (!selectedTrackId) return null;
-    return shareInfo?.tracks.find((e) => e.id === selectedTrackId);
+    return shareInfo?.tracks.find((e) => e.id === selectedTrackId) ?? null;
   }, [selectedTrackId, shareInfo]);
 
-  useEffect(() => {
-    if (audioRef.current) setAudioElement(audioRef.current);
-  }, [audioRef.current, setAudioElement]);
+  const audioCallbackRef = (el: HTMLAudioElement | null) => {
+    setAudioElement(el);
+  };
 
   useEffect(() => {
     if (!url) return;
+
+    const controller = new AbortController();
     setLoading(true);
-    fetch(`/api/extract?url=${url}`)
-      .then((r) => r.json())
+    setError(null);
+
+    fetch(`/api/extract?url=${encodeURIComponent(url)}`, {
+      signal: controller.signal,
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`Request failed: ${r.status}`);
+        return r.json();
+      })
       .then((r) => {
         setShareInfo(r.shareInfo);
-        setSelectedTrackId(r.shareInfo.tracks[0].id);
-        console.log(r);
+        const firstTrack = r.shareInfo?.tracks?.[0];
+        if (firstTrack) setSelectedTrackId(firstTrack.id);
         setLoading(false);
       })
       .catch((e) => {
-        setError(e);
+        if (controller.signal.aborted) return;
+        setError(e instanceof Error ? e : new Error(String(e)));
         setLoading(false);
       });
-  }, [url]);
+
+    return () => controller.abort();
+  }, [url, setShareInfo, setSelectedTrackId]);
 
   return (
     <div
@@ -126,9 +145,9 @@ export default function App() {
     "
     >
       {loading && <Loading />}
-      {error && <Error error={error} />}
+      {error && <ErrorView error={error} />}
       {!loading && !error && (
-        <ShareInfo shareInfo={shareInfo} selectedTrack={selectedTrackId} />
+        <ShareInfoView shareInfo={shareInfo} selectedTrack={selectedTrackId} />
       )}
       {selectedTrackObj && shareInfo && (
         <div className="fixed bottom-4 left-4 w-[calc(100%-32px)]">
@@ -136,7 +155,7 @@ export default function App() {
             key={selectedTrackObj.id}
             controls
             className="mx-auto max-w-2xl w-full"
-            ref={audioRef}
+            ref={audioCallbackRef}
           >
             <source
               src={`${new URL(shareInfo.shareUrl).origin}/share/s/${selectedTrackObj.id}`}
