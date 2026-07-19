@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import useQueryParams from "react-use-query-params";
-import type { ShareInfo as ShareInfoType } from "../../index";
+import type { ShareInfo as ShareInfoType } from "../../types";
 import { Centered, Error as ErrorView, Loading } from "./components/umm";
 import { formatSeconds } from "./utils";
 import { Playing } from "./components/playing";
@@ -98,11 +98,11 @@ export default function App() {
 
   const selectedTrackObj = useMemo(() => {
     if (!selectedTrackId) return null;
-    return shareInfo?.tracks.find((e) => e.id === selectedTrackId) ?? null;
+    return shareInfo?.tracks.find((e: { id: string }) => e.id === selectedTrackId) ?? null;
   }, [selectedTrackId, shareInfo]);
 
   const audioCallbackRef = (el: HTMLAudioElement | null) => {
-    setAudioElement(el);
+    if (el) setAudioElement(el);
   };
 
   useEffect(() => {

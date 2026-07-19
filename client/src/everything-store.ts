@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ShareInfo } from "../..";
+import type { ShareInfo } from "../../types";
 
 interface EverythingState {
   audioElement: HTMLAudioElement | null;

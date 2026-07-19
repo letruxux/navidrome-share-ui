@@ -1,31 +1,26 @@
+import { staticPlugin } from "@elysiajs/static";
 import Elysia, { status } from "elysia";
 import * as cheerio from "cheerio";
+import type { ShareInfo } from "./types";
 
 const app = new Elysia();
 
-export interface ShareInfo {
-  id: string;
-  description: string;
-  downloadable: boolean;
-  tracks: {
-    id: string;
-    title: string;
-    artist: string;
-    album: string;
-    updatedAt: string;
-    duration: number;
-  }[];
-  shareUrl: string;
-}
+await app.use(
+  staticPlugin({
+    assets: "client/dist",
+    prefix: "/",
+  }),
+);
 
-app.get("/extract", async (c) => {
+app.get("/", () => Bun.file("client/dist/index.html"));
+
+app.get("/api/extract", async (c) => {
   const { url } = c.query;
-  console.log(url);
   if (!url) return status(400, { message: "Missing URL" });
   const html = await fetch(url).then((r) => r.text());
   const $ = cheerio.load(html);
   let shareInfo: ShareInfo | null = null;
-  $("script").each((i, el) => {
+  $("script").each((_, el) => {
     const inner = ($(el).html() || "").trim();
     if (inner.startsWith("window.__SHARE_INFO__")) {
       const foundShareInfo = JSON.parse(
@@ -39,6 +34,6 @@ app.get("/extract", async (c) => {
 });
 
 Bun.serve({
-  port: 3006,
+  port: process.env.PORT ? Number(process.env.PORT) : 3006,
   fetch: app.fetch,
 });
