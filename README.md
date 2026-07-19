@@ -1,15 +1,9 @@
 # navidrome-share-ui
 
-To install dependencies:
+Slightly better navidrome share ui
 
-```bash
-bun install
-```
+<url>?url=<navidrome-share-url>
 
-To run:
+## note
 
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.3.14. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+The code is pretty bad, ui is not completed, nothing is finished, i don't even know why i made this
