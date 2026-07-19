@@ -2,7 +2,7 @@
 
 Slightly better navidrome share ui
 
-<url>?url=<navidrome-share-url>
+`<url>?url=<navidrome-share-url>`
 
 ## note
 
